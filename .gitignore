@@ -203,6 +203,34 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# CSE153 Assignment 2 — local envs (use requirements.txt to recreate)
+.venv/
+.venv-*/
+
+# Training logs
+train_log.txt
+*.log
+
+# Model checkpoints (reproducible from notebooks)
+*.pt
+
+# Generated plots
+loss_curves.png
+
+# Generated MIDI (reproducible from notebooks; submit separately to Gradescope)
+symbolic_unconditioned.mid
+symbolic_conditioned.mid
+
+# Executed notebook exports
+*_executed.ipynb
+
 # Ruff stuff:
 .ruff_cache/
 
