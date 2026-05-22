@@ -154,7 +154,7 @@ def train_with_early_stopping(
                 break
 
     # restore best weights
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
     print(f"Loaded best weights from epoch {best_epoch} (val={best_val:.4f})")
     return train_losses, val_losses, best_epoch
 
@@ -246,7 +246,7 @@ def combine_pieces_to_score(
         piece_score = voices_to_score(voices, vocab, piece_label=label)
         piece_duration = 0.0
         for part in piece_score.parts:
-            for element in part.flat.notesAndRests:
+            for element in part.flatten().notesAndRests:
                 element.offset += offset
                 piece_duration = max(piece_duration, element.offset + element.quarterLength)
             full_score.insert(part)

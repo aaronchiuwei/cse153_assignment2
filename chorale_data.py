@@ -20,7 +20,7 @@ UNK_TOKEN: Token = ("<UNK>", 0.0)
 def encode_part(part) -> list[tuple[int | None, float]]:
     """Convert one voice into a list of (pitch, duration) tuples."""
     sequence = []
-    for element in part.flat.notesAndRests:
+    for element in part.flatten().notesAndRests:
         duration = float(element.quarterLength)
         if isinstance(element, note.Note):
             sequence.append((element.pitch.midi, duration))
