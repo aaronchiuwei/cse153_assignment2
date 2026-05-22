@@ -299,23 +299,29 @@ def combine_harmonizations_to_score(
     gap_quarters: float = 4.0,
 ) -> stream.Score:
     """
-    Lay out multiple harmonized chorales sequentially.
+    Lay out multiple harmonized chorales sequentially into 4 persistent parts.
 
     Each piece is (label, soprano, alto, tenor, bass).
     """
-    full_score = stream.Score()
-    offset = 0.0
+    import copy
 
+    full_score = stream.Score()
+    voice_parts = []
+    for name in VOICE_NAMES:
+        part = stream.Part()
+        part.partName = name
+        full_score.insert(0, part)
+        voice_parts.append(part)
+
+    offset = 0.0
     for label, sop, alto, tenor, bass in pieces:
         piece = harmonized_chorale_to_score(sop, alto, tenor, bass, vocab, title=label)
         piece_duration = 0.0
-        for part in piece.parts:
-            for element in part.flatten().notesAndRests:
-                element.offset += offset
-                piece_duration = max(
-                    piece_duration, element.offset + element.quarterLength
-                )
-            full_score.insert(part)
+        for voice_part, piece_part in zip(voice_parts, piece.parts):
+            for element in piece_part.flatten().notesAndRests:
+                piece_duration = max(piece_duration, element.offset + element.quarterLength)
+                el = copy.deepcopy(element)
+                voice_part.insert(element.offset + offset, el)
         offset += piece_duration + gap_quarters
 
     return full_score

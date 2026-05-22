@@ -227,8 +227,8 @@ train_log.txt
 loss_curves.png
 
 # Generated MIDI (reproducible from notebooks; submit separately to Gradescope)
-symbolic_unconditioned.mid
-symbolic_conditioned.mid
+*.mid
+*.wav
 
 # Executed notebook exports
 *_executed.ipynb
