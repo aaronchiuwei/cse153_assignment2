@@ -167,6 +167,15 @@ def _sample_next(logits: torch.Tensor, temperature: float) -> int:
     return int(torch.multinomial(probs, 1).item())
 
 
+# Standard SATB voice pitch ranges (MIDI)
+VOICE_PITCH_RANGES: dict[str, tuple[int, int]] = {
+    "Soprano": (60, 81),  # C4–A5
+    "Alto":    (53, 74),  # F3–D5
+    "Tenor":   (48, 69),  # C3–A4
+    "Bass":    (36, 62),  # C2–D4
+}
+
+
 @torch.no_grad()
 def generate_sequence(
     model: ChoraleLSTM,
@@ -175,6 +184,7 @@ def generate_sequence(
     temperature: float = 1.0,
     seed_ids: Sequence[int] | None = None,
     context_size: int = 32,
+    pitch_range: tuple[int, int] | None = None,
     device: torch.device | None = None,
 ) -> list[int]:
     """Autoregressively generate a token sequence of the given length."""
@@ -184,20 +194,41 @@ def generate_sequence(
     model.eval()
     valid_ids = [i for i in range(len(vocab)) if i not in SPECIAL_IDS]
 
+    # Build mask: allow tokens whose pitch is in range (or is a rest)
+    if pitch_range is not None:
+        lo, hi = pitch_range
+        mask = torch.full((len(vocab),), float("-inf"))
+        for tid in valid_ids:
+            pitch, _ = vocab.id_to_token[tid]
+            if pitch is None or (lo <= pitch <= hi):  # rest or in-range note
+                mask[tid] = 0.0
+        # Fall back to all valid if mask is empty (shouldn't happen)
+        if mask[valid_ids].max() == float("-inf"):
+            mask = torch.zeros(len(vocab))
+        mask = mask.to(device)
+    else:
+        mask = None
+
     if seed_ids:
         generated = list(seed_ids)
     else:
-        generated = [random.choice(valid_ids)]
+        start_pool = valid_ids if mask is None else [
+            tid for tid in valid_ids if mask[tid] == 0.0
+        ]
+        generated = [random.choice(start_pool)]
 
     hidden = None
     while len(generated) < length:
-        window = min(len(generated), context_size)
-        x = torch.tensor([generated[-window:]], dtype=torch.long, device=device)
+        x = torch.tensor([[generated[-1]]], dtype=torch.long, device=device)
 
         logits, hidden = model(x, hidden)
-        next_id = _sample_next(logits[0, -1], temperature)
+        lg = logits[0, -1]
+        if mask is not None:
+            lg = lg + mask
+        next_id = _sample_next(lg, temperature)
         if next_id in SPECIAL_IDS:
-            next_id = random.choice(valid_ids)
+            fallback = valid_ids if mask is None else [tid for tid in valid_ids if mask[tid] == 0.0]
+            next_id = random.choice(fallback)
         generated.append(next_id)
 
     return generated[:length]
@@ -265,8 +296,9 @@ def generate_piece(
 ) -> list[list[int]]:
     """Generate one four-voice piece (unconditioned across voices)."""
     voices = []
-    for i in range(4):
+    for i, voice_name in enumerate(VOICE_NAMES):
         seed = list(seed_sequences[i][:8]) if seed_sequences and i < len(seed_sequences) else None
+        pitch_range = VOICE_PITCH_RANGES.get(voice_name)
         voices.append(
             generate_sequence(
                 model,
@@ -274,6 +306,7 @@ def generate_piece(
                 length=voices_length,
                 temperature=temperature,
                 seed_ids=seed,
+                pitch_range=pitch_range,
                 device=device,
             )
         )
